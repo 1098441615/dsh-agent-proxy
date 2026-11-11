@@ -11,30 +11,38 @@ window.__ModuleLoader__.load({
       title: '代理',
       rowTitle: '代理 dsh',
       rowHint: 'dsh 使用 git 等工具超时时可开启代理',
+      addressLabel: '代理地址',
+      addressPlaceholder: 'http://127.0.0.1:7890',
+      addressHint: '仅支持 http 代理；留空则自动使用系统代理',
       loading: '读取中…',
       viaSystem: 'Windows 系统代理',
-      viaConfig: '配置中的代理',
+      viaConfig: '自定义地址',
       viaEnv: '环境变量中的代理',
       current: '当前代理',
-      noProxy: '未检测到系统代理，请先打开代理软件的系统代理，或在插件配置里填写 proxyUrl',
+      noProxy: '未检测到系统代理，请填写代理地址，或先打开代理软件的系统代理',
       loadFailed: '读取代理状态失败',
       toggleFailed: '切换失败',
-      saveFailed: '已生效，但没能写入配置，重启后会恢复为关闭',
+      saveFailed: '保存失败',
+      addressBad: '地址无效：仅支持 http:// 或 https://，例如 http://127.0.0.1:7890',
     };
 
     const EN = {
       title: 'Proxy',
       rowTitle: 'Proxy for dsh',
       rowHint: 'Turn this on when git and other tools keep timing out',
+      addressLabel: 'Proxy address',
+      addressPlaceholder: 'http://127.0.0.1:7890',
+      addressHint: 'HTTP proxies only; leave empty to use the system proxy',
       loading: 'Loading…',
       viaSystem: 'Windows system proxy',
-      viaConfig: 'proxy from config',
+      viaConfig: 'custom address',
       viaEnv: 'proxy from environment',
       current: 'Current proxy',
-      noProxy: 'No system proxy detected. Turn on your proxy client system proxy, or set proxyUrl in the plugin config.',
+      noProxy: 'No system proxy detected. Enter an address, or turn on your proxy client system proxy.',
       loadFailed: 'Failed to read the proxy state',
       toggleFailed: 'Failed to switch',
-      saveFailed: 'Applied, but the setting could not be saved; it reverts to off after a restart',
+      saveFailed: 'Failed to save',
+      addressBad: 'Invalid address: http:// or https:// only, e.g. http://127.0.0.1:7890',
     };
 
     const styles = {
@@ -45,7 +53,7 @@ window.__ModuleLoader__.load({
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '12px',
         boxSizing: 'border-box',
       },
       row: {
@@ -86,6 +94,28 @@ window.__ModuleLoader__.load({
         fontSize: '12px',
         lineHeight: 1.5,
         color: 'var(--dsw-alias-label-danger, #cf222e)',
+      },
+      field: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+      },
+      fieldLabel: {
+        fontSize: '13px',
+        lineHeight: 1.4,
+        color: 'var(--dsw-alias-label-secondary, #57606a)',
+      },
+      input: {
+        boxSizing: 'border-box',
+        width: '100%',
+        border: '1px solid var(--dsw-alias-border-l2, #d0d7de)',
+        background: 'var(--dsw-alias-bg-layer-2, #ffffff)',
+        color: 'var(--dsw-alias-label-primary, #1f2329)',
+        borderRadius: '8px',
+        padding: '7px 10px',
+        fontSize: '13px',
+        lineHeight: 1.4,
+        outline: 'none',
       },
     };
 
@@ -136,6 +166,7 @@ window.__ModuleLoader__.load({
     function AgentProxySection({ t }) {
       const [state, setState] = React.useState(null);
       const [busy, setBusy] = React.useState(false);
+      const [draft, setDraft] = React.useState('');
       const [message, setMessage] = React.useState(null);
 
       const load = React.useCallback(async () => {
@@ -147,6 +178,7 @@ window.__ModuleLoader__.load({
           const body = await response.json();
           if (!body || body.ok !== true || !body.data) throw new Error(body && body.error ? body.error : 'bad response');
           setState(body.data);
+          setDraft(body.data.configuredUrl || '');
           setMessage(null);
         } catch (error) {
           setMessage({ kind: 'bad', text: t('loadFailed') });
@@ -157,28 +189,50 @@ window.__ModuleLoader__.load({
         load();
       }, [load]);
 
+      const send = async (path, payload) => {
+        const response = await fetch(`${API}${path}`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json', 'x-dsh-agent-proxy': '1' },
+          body: JSON.stringify(payload),
+        });
+        const body = await response.json();
+        if (!body || body.ok !== true || !body.data) {
+          throw new Error(body && body.error ? body.error : t('saveFailed'));
+        }
+        return body.data;
+      };
+
       const toggle = async () => {
         if (busy) return;
         setBusy(true);
         setMessage(null);
         try {
           const next = !(state && state.enabled);
-          const response = await fetch(`${API}/toggle`, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'content-type': 'application/json', 'x-dsh-agent-proxy': '1' },
-            body: JSON.stringify({ enabled: next }),
-          });
-          const body = await response.json();
-          if (!body || body.ok !== true || !body.data) {
-            throw new Error(body && body.error ? body.error : t('toggleFailed'));
-          }
-          setState(body.data);
-          if (body.data.saved === false) setMessage({ kind: 'warn', text: t('saveFailed') });
-          if (body.data.enabled && body.data.error) setMessage({ kind: 'bad', text: body.data.error });
+          const data = await send('/toggle', { enabled: next });
+          setState(data);
+          if (data.saved === false) setMessage({ kind: 'warn', text: t('saveFailed') });
         } catch (error) {
-          setMessage({ kind: 'bad', text: String((error && error.message) || error) });
+          const text = String((error && error.message) || error);
+          setMessage({ kind: 'bad', text: text === 'no-proxy' ? t('noProxy') : text });
           load();
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      const saveAddress = async () => {
+        if (busy) return;
+        if (draft === (state && state.configuredUrl ? state.configuredUrl : '')) return;
+        setBusy(true);
+        setMessage(null);
+        try {
+          const data = await send('/settings', { proxyUrl: draft.trim() });
+          setState(data);
+          setDraft(data.configuredUrl || '');
+        } catch (error) {
+          const text = String((error && error.message) || error);
+          setMessage({ kind: 'bad', text: text === 'no-proxy' ? t('noProxy') : text });
         } finally {
           setBusy(false);
         }
@@ -195,7 +249,9 @@ window.__ModuleLoader__.load({
       })();
 
       const lines = [];
-      if (message) lines.push(h('div', { key: 'msg', style: message.kind === 'warn' ? styles.warn : styles.bad }, message.text));
+      if (message) {
+        lines.push(h('div', { key: 'msg', style: message.kind === 'warn' ? styles.warn : styles.bad }, message.text));
+      }
       if (state === null && !message) lines.push(h('div', { key: 'loading', style: styles.hint }, t('loading')));
       if (state && enabled && proxyUrl) {
         lines.push(
@@ -206,7 +262,9 @@ window.__ModuleLoader__.load({
           ),
         );
       }
-      if (state && !enabled && !proxyUrl) lines.push(h('div', { key: 'noproxy', style: styles.warn }, t('noProxy')));
+      if (state && !enabled && !proxyUrl && !draft) {
+        lines.push(h('div', { key: 'noproxy', style: styles.warn }, t('noProxy')));
+      }
 
       return h(
         'div',
@@ -226,6 +284,30 @@ window.__ModuleLoader__.load({
             label: t('rowTitle'),
             onChange: toggle,
           }),
+        ),
+        h(
+          'div',
+          { style: styles.field },
+          h('label', { style: styles.fieldLabel, htmlFor: 'dsh-agent-proxy-url' }, t('addressLabel')),
+          h('input', {
+            id: 'dsh-agent-proxy-url',
+            type: 'text',
+            spellCheck: false,
+            autoComplete: 'off',
+            value: draft,
+            placeholder: t('addressPlaceholder'),
+            disabled: busy || state === null,
+            onChange: (event) => setDraft(event.target.value),
+            onBlur: () => {
+              saveAddress();
+            },
+            onKeyDown: (event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+            },
+            style: styles.input,
+            'aria-label': t('addressLabel'),
+          }),
+          h('div', { style: styles.hint }, t('addressHint')),
         ),
         lines,
       );

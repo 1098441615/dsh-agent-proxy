@@ -31,11 +31,12 @@ http_proxy https_proxy all_proxy（及大写形式）、NODE_USE_ENV_PROXY=1
 
 按优先级：
 
-1. 插件配置里的 `proxyUrl`；
-2. Windows 系统代理（HKCU Internet Settings，即 Clash / V2Ray 打开的「系统代理」）；
-3. DSH 启动时已导出的 `HTTPS_PROXY` / `HTTP_PROXY`。
+1. 设置页「代理地址」里填写的地址（留空表示自动）；
+2. 插件配置里的 `proxyUrl`；
+3. Windows 系统代理（HKCU Internet Settings，即 Clash / V2Ray 打开的「系统代理」）；
+4. DSH 启动时已导出的 `HTTPS_PROXY` / `HTTP_PROXY`。
 
-设置页开关下方会显示当前生效的地址与来源。
+设置页开关下方有一个「代理地址」输入框：填了就用它（仅支持 `http://` / `https://`），留空自动使用系统代理。地址在失焦或回车时保存，开关开着会立即用新地址重连；开关下方会显示当前生效的地址与来源。
 
 ## 安装
 

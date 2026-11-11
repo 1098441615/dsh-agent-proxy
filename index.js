@@ -21,9 +21,10 @@
  *        - `PIP_PROXY` / `PIP_HTTPS_PROXY`
  *
  * Proxy address resolution, highest first:
- *   1. the row's `config.proxyUrl`
- *   2. the Windows system proxy (HKCU Internet Settings, when enabled)
- *   3. a proxy already exported in the Harness environment
+ *   1. the address saved in the settings page (`$DSH_HOME/agent-proxy.json`)
+ *   2. the row's `config.proxyUrl`
+ *   3. the Windows system proxy (HKCU Internet Settings, when enabled)
+ *   4. a proxy already exported in the Harness environment
  *
  * `config.enabled` is only the initial default before the state file exists.
  */
@@ -524,7 +525,10 @@ export function apply(ctx, rawConfig) {
     delete globalThis[APPLIED]
   }
 
-  const detect = () => resolveProxy(config.proxyUrl)
+  /** Address the user typed in the settings page, or the row's configured default. */
+  const configuredUrl = () => trimOrEmpty(readState()?.customProxyUrl) || trimOrEmpty(config.proxyUrl)
+
+  const detect = () => resolveProxy(configuredUrl())
 
   const enable = () => {
     if (status.enabled) return status
@@ -537,7 +541,7 @@ export function apply(ctx, rawConfig) {
     const restore = existing?.restore ?? captureToolConfig()
     applyToolConfig(resolved.url)
     writeProxyEnvironment(resolved.url)
-    writeState({ enabled: true, proxyUrl: resolved.url, restore })
+    writeState({ ...(existing ?? {}), enabled: true, restore })
     globalThis[APPLIED] = true
     status.enabled = true
     status.proxyUrl = resolved.url
@@ -546,7 +550,7 @@ export function apply(ctx, rawConfig) {
     return status
   }
 
-  const disable = () => {
+  const unapply = () => {
     const restore = readState()?.restore
     if (restore) {
       try {
@@ -557,7 +561,11 @@ export function apply(ctx, rawConfig) {
     }
     restoreOriginalEnvironment()
     delete globalThis[APPLIED]
-    writeState({ enabled: false })
+  }
+
+  const disable = () => {
+    unapply()
+    writeState({ ...(readState() ?? {}), enabled: false })
     status.enabled = false
     status.proxyUrl = ''
     status.source = ''
@@ -572,10 +580,36 @@ export function apply(ctx, rawConfig) {
       enabled: status.enabled,
       proxyUrl: status.enabled ? status.proxyUrl : detected.url,
       source: status.enabled ? status.source : detected.source,
+      configuredUrl: trimOrEmpty(readState()?.customProxyUrl),
       detectedUrl: detected.url,
       detectedSource: detected.source,
       error: status.error,
     }
+  }
+
+  /** Store a custom proxy address ('' = keep using the system proxy) and re-apply it. */
+  const saveProxyUrl = (raw) => {
+    const value = trimOrEmpty(raw)
+    const normalized = value ? normalizeProxyUrl(value) : ''
+    if (value && !normalized) {
+      throw Object.assign(
+        new Error('代理地址无效：仅支持 http:// 或 https:// 地址，例如 http://127.0.0.1:7890'),
+        { statusCode: 400 },
+      )
+    }
+    const wasEnabled = status.enabled
+    if (wasEnabled) {
+      unapply()
+      status.enabled = false
+      status.proxyUrl = ''
+      status.source = ''
+    }
+    const next = { ...(readState() ?? {}), customProxyUrl: normalized }
+    // 0.1.x stored the resolved address here; it is not a user preference.
+    delete next.proxyUrl
+    writeState(next)
+    if (wasEnabled) enable()
+    return snapshot()
   }
 
   const state = readState()
@@ -619,7 +653,7 @@ export function apply(ctx, rawConfig) {
           if (body.enabled) {
             enable()
             if (!status.enabled) {
-              return fail(409, '未检测到代理地址：请先打开代理软件的系统代理，或在插件配置里填写 proxyUrl')
+              return fail(409, '未检测到代理地址：请在下方填写代理地址，或先打开代理软件的系统代理')
             }
           } else {
             disable()
@@ -633,6 +667,25 @@ export function apply(ctx, rawConfig) {
             status.error = messageOf(error)
           }
           return jsonResponse(200, { ok: true, data: { ...snapshot(), saved: stored } })
+        } catch (error) {
+          return fail(error?.statusCode ?? 500, messageOf(error))
+        }
+      },
+    },
+    {
+      path: `${API_PREFIX}/settings`,
+      methods: ['POST'],
+      requestBody: 'buffered',
+      async fetch(request) {
+        const rejected = guardMutation(request)
+        if (rejected) return fail(403, rejected)
+        try {
+          const body = await readJsonBody(request)
+          if (typeof body.proxyUrl !== 'string') {
+            return fail(400, 'proxyUrl 必须是字符串')
+          }
+          const data = saveProxyUrl(body.proxyUrl)
+          return jsonResponse(200, { ok: true, data: { ...data, saved: true } })
         } catch (error) {
           return fail(error?.statusCode ?? 500, messageOf(error))
         }
