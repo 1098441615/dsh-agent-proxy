@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "代理",
+    "description": "让 DSH 运行的 git、npm、pip 等命令走本机代理。"
+  }
+}

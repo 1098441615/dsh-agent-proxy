@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Proxy switch",
+    "description": "Turns a local HTTP proxy on for the git, npm and pip commands DSH runs."
+  }
+}

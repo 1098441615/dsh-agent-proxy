@@ -1,0 +1,62 @@
+{
+  "name": "dsh-agent-proxy",
+  "version": "0.1.0",
+  "description": "A settings-page switch that turns a local HTTP proxy on for the git, npm and pip commands DSH runs.",
+  "type": "module",
+  "license": "MIT",
+  "author": "1098441615",
+  "homepage": "https://github.com/1098441615/dsh-agent-proxy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1098441615/dsh-agent-proxy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/1098441615/dsh-agent-proxy/issues"
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.1 <0.3.0"
+  },
+  "icon": "icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "proxy",
+    "git",
+    "npm",
+    "pip",
+    "proxy-switch"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}

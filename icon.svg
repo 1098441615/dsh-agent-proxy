@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Proxy switch">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <circle cx="30" cy="30" r="14" fill="none" stroke="#ffffff" stroke-width="3"/>
+  <path d="M16 30h28M30 16c5 4 7.5 8.5 7.5 14S35 40 30 44c-5-4-7.5-8.5-7.5-14S25 20 30 16Z"
+        fill="none" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M44 42l6 6M50 42v6h-6" fill="none" stroke="#ffffff" stroke-width="3"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

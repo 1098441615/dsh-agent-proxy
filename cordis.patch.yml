@@ -1,0 +1,14 @@
+# dsh-agent-proxy 的 bundle patch：把一个开启/关闭开关插入 profile 的插件树。
+# 安装后无需手动编辑 profile 的 cordis.patch.yml。
+#
+# 开关状态由插件通过 config editor 写回本行的 config，重启 DSH 后仍保留。
+# proxyUrl 留空表示自动读取 Windows 系统代理（Clash / V2Ray 等），也可显式填写：
+#   config:
+#     enabled: true
+#     proxyUrl: 'http://127.0.0.1:7890'
+- insert:
+    - id: agent-proxy
+      name: 'dsh-agent-proxy'
+      config:
+        enabled: false
+        proxyUrl: ''
